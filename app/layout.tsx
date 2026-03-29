@@ -1,16 +1,26 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
 import "./globals.css";
 import WhatsAppButton from "./components/WhatsAppButton";
+import ServiceWorker from "./components/ServiceWorker";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
 });
 
+export const viewport: Viewport = {
+  themeColor: "#1E2D5A",
+};
+
 export const metadata: Metadata = {
-  metadataBase: new URL("https://therealtasteofmithila.vercel.app"),
+  metadataBase: new URL("https://therealtasteofmithila.in"),
   title: "Maithil Cuisine — Tradition of Taste",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Maithil Cuisine",
+  },
   description:
     "Experience the authentic flavors of Mithila. Traditional Maithili cuisine bringing the heritage of Bihar and Nepal to your plate.",
   openGraph: {
@@ -39,6 +49,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         {children}
         <WhatsAppButton />
+        <ServiceWorker />
       </body>
     </html>
   );

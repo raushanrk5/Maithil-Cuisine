@@ -9,6 +9,7 @@ const geistSans = Geist({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://therealtasteofmithila.vercel.app"),
   title: "Maithil Cuisine — Tradition of Taste",
   description:
     "Experience the authentic flavors of Mithila. Traditional Maithili cuisine bringing the heritage of Bihar and Nepal to your plate.",

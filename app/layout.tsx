@@ -3,6 +3,7 @@ import { Geist } from "next/font/google";
 import "./globals.css";
 import WhatsAppButton from "./components/WhatsAppButton";
 import ServiceWorker from "./components/ServiceWorker";
+import { CartProvider } from "./context/CartContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -47,9 +48,11 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${geistSans.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
-        {children}
-        <WhatsAppButton />
-        <ServiceWorker />
+        <CartProvider>
+          {children}
+          <WhatsAppButton />
+          <ServiceWorker />
+        </CartProvider>
       </body>
     </html>
   );

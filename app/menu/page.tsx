@@ -2,6 +2,7 @@ import Link from "next/link";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import MenuTabs from "./MenuTabs";
+import CartBar from "../components/CartBar";
 
 export const metadata = {
   title: "Menu — Maithil Cuisine",
@@ -71,6 +72,7 @@ export default function MenuPage() {
       </div>
 
       <Footer />
+      <CartBar />
     </>
   );
 }

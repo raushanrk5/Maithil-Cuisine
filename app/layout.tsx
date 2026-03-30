@@ -4,6 +4,7 @@ import "./globals.css";
 import WhatsAppButton from "./components/WhatsAppButton";
 import ServiceWorker from "./components/ServiceWorker";
 import { CartProvider } from "./context/CartContext";
+import { Analytics } from "@vercel/analytics/next";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -52,6 +53,7 @@ export default function RootLayout({
           {children}
           <WhatsAppButton />
           <ServiceWorker />
+          <Analytics />
         </CartProvider>
       </body>
     </html>

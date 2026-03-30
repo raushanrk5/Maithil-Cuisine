@@ -1,36 +1,79 @@
 import { supabase } from "../../lib/supabase";
 import { Resend } from "resend";
+import { vegMenu, nonVegMenu } from "../../data/menu";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-type OrderItem = {
-  name: string;
-  price: number;
-  quantity: number;
-};
+// Build canonical price map — single source of truth, never trust the client
+function parseMenuPrice(priceStr: string): number {
+  const match = priceStr.match(/\d+/);
+  return match ? parseInt(match[0]) : 0;
+}
+
+const priceMap = new Map<string, number>();
+for (const category of [...vegMenu, ...nonVegMenu]) {
+  for (const item of category.items) {
+    priceMap.set(item.name, parseMenuPrice(item.price));
+  }
+}
+
+function escapeHtml(str: string): string {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+type RawItem = { name: string; quantity: unknown };
 
 export async function POST(request: Request) {
   try {
-    const { name, phone, address, items, total } = await request.json();
+    const { name, phone, address, items } = await request.json();
 
     if (!name || !phone || !address || !items?.length) {
       return Response.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    // Upsert customer (save or update their details)
+    if (!/^\d{10}$/.test(phone)) {
+      return Response.json({ error: "Invalid phone number" }, { status: 400 });
+    }
+
+    if (typeof name !== "string" || name.length > 100) {
+      return Response.json({ error: "Invalid name" }, { status: 400 });
+    }
+
+    if (typeof address !== "string" || address.length > 500) {
+      return Response.json({ error: "Invalid address" }, { status: 400 });
+    }
+
+    // Validate every item against the menu and compute total server-side
+    const validatedItems: Array<{ name: string; price: number; quantity: number }> = [];
+    for (const item of items as RawItem[]) {
+      const price = priceMap.get(item.name);
+      if (!price) {
+        return Response.json({ error: `Unknown item: ${item.name}` }, { status: 400 });
+      }
+      const qty = Math.max(1, Math.floor(Number(item.quantity)));
+      validatedItems.push({ name: item.name, price, quantity: qty });
+    }
+    const total = validatedItems.reduce((s, i) => s + i.price * i.quantity, 0);
+
+    // Upsert customer
     await supabase.from("customers").upsert(
       { phone, name, address, updated_at: new Date().toISOString() },
       { onConflict: "phone" }
     );
 
-    // Save order
+    // Save order with server-computed total
     const { data: order, error } = await supabase
       .from("orders")
       .insert({
         customer_phone: phone,
         customer_name: name,
         customer_address: address,
-        items,
+        items: validatedItems,
         total,
       })
       .select("id")
@@ -40,7 +83,11 @@ export async function POST(request: Request) {
 
     const orderId = order.id.slice(0, 8).toUpperCase();
 
-    // Send email notification to owner
+    // Escape all user content before embedding in HTML email
+    const safeName = escapeHtml(name);
+    const safePhone = escapeHtml(phone);
+    const safeAddress = escapeHtml(address);
+
     await resend.emails.send({
       from: "onboarding@resend.dev",
       to: process.env.OWNER_EMAIL!,
@@ -56,9 +103,9 @@ export async function POST(request: Request) {
 
             <h2 style="color: #1E2D5A; font-size: 16px; margin: 0 0 12px;">Customer Details</h2>
             <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px;">
-              <tr><td style="padding: 4px 0; color: #666; width: 100px;">Name</td><td style="font-weight: bold; color: #1E2D5A;">${name}</td></tr>
-              <tr><td style="padding: 4px 0; color: #666;">Phone</td><td style="font-weight: bold; color: #1E2D5A;">${phone}</td></tr>
-              <tr><td style="padding: 4px 0; color: #666;">Address</td><td style="font-weight: bold; color: #1E2D5A;">${address}</td></tr>
+              <tr><td style="padding: 4px 0; color: #666; width: 100px;">Name</td><td style="font-weight: bold; color: #1E2D5A;">${safeName}</td></tr>
+              <tr><td style="padding: 4px 0; color: #666;">Phone</td><td style="font-weight: bold; color: #1E2D5A;">${safePhone}</td></tr>
+              <tr><td style="padding: 4px 0; color: #666;">Address</td><td style="font-weight: bold; color: #1E2D5A;">${safeAddress}</td></tr>
             </table>
 
             <h2 style="color: #1E2D5A; font-size: 16px; margin: 0 0 12px;">Order Items</h2>
@@ -71,11 +118,11 @@ export async function POST(request: Request) {
                 </tr>
               </thead>
               <tbody>
-                ${items
+                ${validatedItems
                   .map(
-                    (item: OrderItem, i: number) => `
+                    (item, i) => `
                   <tr style="background: ${i % 2 === 0 ? "white" : "#FDF5E6"}">
-                    <td style="padding: 8px 12px; color: #1E2D5A;">${item.name}</td>
+                    <td style="padding: 8px 12px; color: #1E2D5A;">${escapeHtml(item.name)}</td>
                     <td style="padding: 8px 12px; text-align: center; color: #1E2D5A;">×${item.quantity}</td>
                     <td style="padding: 8px 12px; text-align: right; color: #8B2020; font-weight: bold;">₹${item.price * item.quantity}</td>
                   </tr>

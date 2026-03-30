@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { vegMenu, nonVegMenu, type MenuCategory, type MenuItem } from "../data/menu";
 import { useCart } from "../context/CartContext";
+import type { Availability } from "../api/availability/route";
 
 const categoryIcons: Record<string, string> = {
   Breakfast: "🌅",
@@ -40,7 +41,15 @@ function groupCategories(categories: MenuCategory[]): Array<MenuCategory | MenuC
   return groups;
 }
 
-function ItemRow({ item, index }: { item: MenuItem; index: number }) {
+function ItemRow({
+  item,
+  index,
+  disabled,
+}: {
+  item: MenuItem;
+  index: number;
+  disabled: boolean;
+}) {
   const { items, addItem, updateQuantity } = useCart();
   const price = parsePrice(item.price);
   const cartItem = items.find((i) => i.name === item.name);
@@ -50,68 +59,92 @@ function ItemRow({ item, index }: { item: MenuItem; index: number }) {
     <div
       className={`flex items-center gap-3 px-4 py-3 ${
         index % 2 === 0 ? "bg-white" : "bg-brand-cream/40"
-      }`}
+      } ${disabled ? "opacity-50" : ""}`}
     >
       <span className="w-1.5 h-1.5 rounded-full bg-brand-gold/60 shrink-0" />
       <span className="text-brand-navy text-sm flex-1">{item.name}</span>
-      <span className="text-brand-crimson font-bold text-sm shrink-0 tabular-nums">
-        {item.price}
-      </span>
 
-      {/* Cart controls */}
-      {quantity === 0 ? (
-        <button
-          onClick={() => addItem(item.name, price)}
-          className="w-7 h-7 rounded-full bg-brand-crimson text-white font-bold text-lg flex items-center justify-center hover:bg-brand-crimson-light transition-colors shrink-0"
-        >
-          +
-        </button>
+      {disabled ? (
+        <span className="text-xs text-red-400 font-medium shrink-0">Not available</span>
       ) : (
-        <div className="flex items-center gap-1.5 shrink-0">
-          <button
-            onClick={() => updateQuantity(item.name, -1)}
-            className="w-7 h-7 rounded-full border-2 border-brand-crimson text-brand-crimson font-bold text-lg flex items-center justify-center hover:bg-brand-crimson hover:text-white transition-colors"
-          >
-            −
-          </button>
-          <span className="text-brand-navy font-bold text-sm w-4 text-center tabular-nums">
-            {quantity}
+        <>
+          <span className="text-brand-crimson font-bold text-sm shrink-0 tabular-nums">
+            {item.price}
           </span>
-          <button
-            onClick={() => updateQuantity(item.name, +1)}
-            className="w-7 h-7 rounded-full bg-brand-crimson text-white font-bold text-lg flex items-center justify-center hover:bg-brand-crimson-light transition-colors"
-          >
-            +
-          </button>
-        </div>
+          {quantity === 0 ? (
+            <button
+              onClick={() => addItem(item.name, price)}
+              className="w-7 h-7 rounded-full bg-brand-crimson text-white font-bold text-lg flex items-center justify-center hover:bg-brand-crimson-light transition-colors shrink-0"
+            >
+              +
+            </button>
+          ) : (
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                onClick={() => updateQuantity(item.name, -1)}
+                className="w-7 h-7 rounded-full border-2 border-brand-crimson text-brand-crimson font-bold text-lg flex items-center justify-center hover:bg-brand-crimson hover:text-white transition-colors"
+              >
+                −
+              </button>
+              <span className="text-brand-navy font-bold text-sm w-4 text-center tabular-nums">
+                {quantity}
+              </span>
+              <button
+                onClick={() => updateQuantity(item.name, +1)}
+                className="w-7 h-7 rounded-full bg-brand-crimson text-white font-bold text-lg flex items-center justify-center hover:bg-brand-crimson-light transition-colors"
+              >
+                +
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
 }
 
-function CategoryCard({ category }: { category: MenuCategory }) {
+function CategoryCard({
+  category,
+  availability,
+}: {
+  category: MenuCategory;
+  availability: Availability;
+}) {
   const icon = categoryIcons[category.name] ?? "✦";
+  const catDisabled = availability.disabled_categories.includes(category.name);
+
   return (
     <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-brand-cream-dark h-full">
-      <div className="bg-brand-navy px-5 py-4 flex items-center gap-3">
+      <div className={`px-5 py-4 flex items-center gap-3 ${catDisabled ? "bg-brand-navy/30" : "bg-brand-navy"}`}>
         <span className="text-2xl">{icon}</span>
         <h3 className="text-brand-gold font-bold text-base sm:text-lg tracking-wide">
           {category.name}
         </h3>
-        <span className="ml-auto text-white/30 text-xs font-medium shrink-0">
-          {category.items.length} items
-        </span>
+        {catDisabled ? (
+          <span className="ml-auto text-red-300 text-xs font-semibold shrink-0 bg-red-900/30 px-2 py-0.5 rounded-full">
+            Not available today
+          </span>
+        ) : (
+          <span className="ml-auto text-white/30 text-xs font-medium shrink-0">
+            {category.items.length} items
+          </span>
+        )}
       </div>
       <div className="divide-y divide-brand-cream-dark">
         {category.items.map((item, i) => (
-          <ItemRow key={item.name} item={item} index={i} />
+          <ItemRow
+            key={item.name}
+            item={item}
+            index={i}
+            disabled={catDisabled || availability.disabled_items.includes(item.name)}
+          />
         ))}
       </div>
     </div>
   );
 }
 
-export default function MenuTabs() {
+export default function MenuTabs({ availability }: { availability: Availability }) {
   const [tab, setTab] = useState<"veg" | "nonveg">("veg");
   const menu = tab === "veg" ? vegMenu : nonVegMenu;
   const groups = groupCategories(menu);
@@ -156,11 +189,11 @@ export default function MenuTabs() {
           Array.isArray(group) ? (
             <div key={idx} className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-6">
               {group.map((cat) => (
-                <CategoryCard key={cat.name} category={cat} />
+                <CategoryCard key={cat.name} category={cat} availability={availability} />
               ))}
             </div>
           ) : (
-            <CategoryCard key={group.name} category={group} />
+            <CategoryCard key={group.name} category={group} availability={availability} />
           )
         )}
       </div>

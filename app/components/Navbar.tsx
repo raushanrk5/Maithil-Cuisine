@@ -18,7 +18,7 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between py-2">
           {/* Logo */}
-          <a href="/" className="flex items-center">
+          <a href="/" className="flex items-center gap-3">
             <Image
               src="/logo.png"
               alt="Maithil Cuisine Logo"
@@ -26,6 +26,15 @@ export default function Navbar() {
               height={100}
               className="w-18 h-18 sm:w-26 sm:h-26"
             />
+            <div>
+              <div className="font-bold text-base sm:text-lg leading-tight">
+                <span className="text-brand-crimson">मैथिल</span>
+                <span className="text-brand-navy"> Cuisine</span>
+              </div>
+              <div className="text-brand-navy/50 text-[9px] sm:text-[10px] tracking-[0.3em] uppercase font-semibold">
+                Tradition of Taste
+              </div>
+            </div>
           </a>
 
           {/* Desktop Nav */}

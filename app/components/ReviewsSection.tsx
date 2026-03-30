@@ -8,7 +8,7 @@ export default async function ReviewsSection() {
   // Don't render the section if no data or no reviews
   if (!data || data.reviews.length === 0) return null;
 
-  const reviews = data.reviews.filter((r) => r.rating >= 4);
+  const reviews = data.reviews.filter((r) => r.rating >= 4 && r.text);
   if (reviews.length === 0) return null;
 
   return (

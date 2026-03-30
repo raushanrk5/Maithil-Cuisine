@@ -71,7 +71,7 @@ export default function ReviewsMarquee({ reviews }: { reviews: Review[] }) {
 
             {/* Text */}
             <p className="text-brand-navy/70 text-sm leading-relaxed flex-1 line-clamp-4">
-              {review.text || "Great experience!"}
+              {review.text}
             </p>
           </div>
         ))}

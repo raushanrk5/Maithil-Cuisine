@@ -3,6 +3,7 @@ import { Geist } from "next/font/google";
 import "./globals.css";
 import WhatsAppButton from "./components/WhatsAppButton";
 import ServiceWorker from "./components/ServiceWorker";
+import { Analytics } from "@vercel/analytics/next";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -50,6 +51,7 @@ export default function RootLayout({
         {children}
         <WhatsAppButton />
         <ServiceWorker />
+        <Analytics />
       </body>
     </html>
   );

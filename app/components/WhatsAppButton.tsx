@@ -1,10 +1,15 @@
-// Replace with your real WhatsApp number (with country code, no + or spaces)
+"use client";
+
+import { usePathname } from "next/navigation";
+
 const WHATSAPP_NUMBER = "917563042905";
 const WHATSAPP_MESSAGE = "Hello! I'd like to make a reservation at Maithil Cuisine. 🍛";
-
 const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(WHATSAPP_MESSAGE)}`;
 
 export default function WhatsAppButton() {
+  const pathname = usePathname();
+  if (pathname.startsWith("/staff") || pathname.startsWith("/ops")) return null;
+
   return (
     <a
       href={whatsappUrl}

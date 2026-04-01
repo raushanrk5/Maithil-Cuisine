@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../lib/supabase";
 import { vegMenu, nonVegMenu } from "../data/menu";
+import { stockCategories } from "../data/stock";
 import type { Availability } from "../api/availability/route";
 import type { StaffOrder } from "./page";
 
@@ -44,12 +45,16 @@ export default function StaffClient({
 }) {
   const router = useRouter();
   const [orders, setOrders] = useState<StaffOrder[]>(initialOrders);
-  const [tab, setTab] = useState<"orders" | "menu">("orders");
+  const [tab, setTab] = useState<"orders" | "menu" | "stock">("orders");
   const [availability, setAvailability] = useState<Availability>(initial);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [stockItems, setStockItems] = useState<Record<string, string>>({});
+  const [stockSending, setStockSending] = useState(false);
+  const [stockSent, setStockSent] = useState(false);
+  const [stockError, setStockError] = useState(false);
   const audioCtx = useRef<AudioContext | null>(null);
 
   function playAlert() {
@@ -86,6 +91,42 @@ export default function StaffClient({
 
     return () => { supabase.removeChannel(channel); };
   }, []);
+
+  function toggleStock(name: string) {
+    setStockItems((prev) => {
+      const next = { ...prev };
+      if (name in next) delete next[name];
+      else next[name] = "";
+      return next;
+    });
+  }
+
+  function setStockQty(name: string, qty: string) {
+    setStockItems((prev) => ({ ...prev, [name]: qty }));
+  }
+
+  async function sendStockReport() {
+    setStockSending(true);
+    setStockSent(false);
+    setStockError(false);
+    const payload = Object.fromEntries(
+      Object.entries(stockItems).map(([name, qty]) => [name, { qty }])
+    );
+    const res = await fetch("/api/stock-report", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    setStockSending(false);
+    if (res.ok) {
+      setStockSent(true);
+      setStockItems({});
+      setTimeout(() => setStockSent(false), 3000);
+    } else {
+      setStockError(true);
+      setTimeout(() => setStockError(false), 3000);
+    }
+  }
 
   async function handleLogout() {
     await fetch("/api/staff-logout", { method: "POST" });
@@ -151,7 +192,7 @@ export default function StaffClient({
       {/* Tabs */}
       <div className="bg-white border-b border-brand-cream-dark px-4 sm:px-8">
         <div className="flex gap-6 max-w-3xl mx-auto">
-          {(["orders", "menu"] as const).map((t) => (
+          {(["orders", "menu", "stock"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -161,7 +202,7 @@ export default function StaffClient({
                   : "border-transparent text-brand-navy/40 hover:text-brand-navy"
               }`}
             >
-              {t === "orders" ? `Today's Orders (${orders.length})` : "Menu Availability"}
+              {t === "orders" ? `Today's Orders (${orders.length})` : t === "menu" ? "Menu Availability" : "Stock Report"}
             </button>
           ))}
         </div>
@@ -312,6 +353,71 @@ export default function StaffClient({
             </div>
           </div>
         )}
+        {/* Stock report tab */}
+        {tab === "stock" && (
+          <div>
+            <p className="text-brand-navy/50 text-sm mb-5">
+              Check items that are running low or out of stock for tomorrow. Enter quantity if some are left.
+            </p>
+
+            <div className="flex flex-col gap-3 mb-24">
+              {stockCategories.map((cat) => (
+                <div key={cat.name} className="bg-white rounded-2xl border border-brand-cream-dark overflow-hidden">
+                  <div className="px-5 py-3 bg-brand-navy/5 border-b border-brand-cream-dark">
+                    <span className="font-bold text-sm text-brand-navy">{cat.name}</span>
+                  </div>
+                  <div className="divide-y divide-brand-cream-dark">
+                    {cat.items.map((item) => {
+                      const checked = item in stockItems;
+                      return (
+                        <div key={item} className="flex items-center gap-3 px-5 py-3">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleStock(item)}
+                            className="w-4 h-4 accent-brand-crimson shrink-0"
+                          />
+                          <span className={`flex-1 text-sm font-medium ${checked ? "line-through text-brand-navy/30" : "text-brand-navy"}`}>
+                            {item}
+                          </span>
+                          {checked && (
+                            <input
+                              type="number"
+                              min="0"
+                              placeholder="qty to buy"
+                              value={stockItems[item]}
+                              onChange={(e) => setStockQty(item, e.target.value)}
+                              className="w-24 text-sm border border-brand-cream-dark rounded-lg px-2 py-1 text-brand-navy text-center focus:outline-none focus:border-brand-crimson"
+                            />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Sticky submit bar */}
+            <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-brand-cream-dark px-4 py-4 flex items-center justify-between">
+              <div>
+                {stockSent && <span className="text-xs text-green-600 font-semibold">✓ Report sent to Telegram</span>}
+                {stockError && <span className="text-xs text-red-500 font-semibold">Failed to send</span>}
+                {!stockSent && !stockError && Object.keys(stockItems).length > 0 && (
+                  <span className="text-xs text-brand-navy/50">{Object.keys(stockItems).length} item{Object.keys(stockItems).length > 1 ? "s" : ""} flagged</span>
+                )}
+              </div>
+              <button
+                onClick={sendStockReport}
+                disabled={stockSending || Object.keys(stockItems).length === 0}
+                className="bg-brand-crimson text-white text-sm font-semibold px-6 py-2.5 rounded-xl disabled:opacity-40 transition-opacity"
+              >
+                {stockSending ? "Sending..." : "Send Report"}
+              </button>
+            </div>
+          </div>
+        )}
+
       </div>
     </main>
   );

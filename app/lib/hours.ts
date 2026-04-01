@@ -1,5 +1,5 @@
 // Restaurant operating hours: 11:30 AM – 11:00 PM IST
-const OPEN_MINUTES = 7 * 60 + 30; // 690
+const OPEN_MINUTES = 11 * 60 + 30; // 690
 const CLOSE_MINUTES = 23 * 60; // 1380
 
 export function isRestaurantOpen(): boolean {

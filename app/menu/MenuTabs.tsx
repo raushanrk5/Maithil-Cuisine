@@ -45,10 +45,12 @@ function ItemRow({
   item,
   index,
   disabled,
+  isOpen,
 }: {
   item: MenuItem;
   index: number;
   disabled: boolean;
+  isOpen: boolean;
 }) {
   const { items, addItem, updateQuantity } = useCart();
   const price = parsePrice(item.price);
@@ -64,8 +66,10 @@ function ItemRow({
       <span className="w-1.5 h-1.5 rounded-full bg-brand-gold/60 shrink-0" />
       <span className="text-brand-navy text-sm flex-1">{item.name}</span>
 
-      {disabled ? (
-        <span className="text-xs text-red-400 font-medium shrink-0">Not available</span>
+      {disabled || !isOpen ? (
+        <span className="text-xs text-red-400 font-medium shrink-0">
+          {!isOpen ? "Closed" : "Not available"}
+        </span>
       ) : (
         <>
           <span className="text-brand-crimson font-bold text-sm shrink-0 tabular-nums">
@@ -106,9 +110,11 @@ function ItemRow({
 function CategoryCard({
   category,
   availability,
+  isOpen,
 }: {
   category: MenuCategory;
   availability: Availability;
+  isOpen: boolean;
 }) {
   const icon = categoryIcons[category.name] ?? "✦";
   const catDisabled = availability.disabled_categories.includes(category.name);
@@ -137,6 +143,7 @@ function CategoryCard({
             item={item}
             index={i}
             disabled={catDisabled || availability.disabled_items.includes(item.name)}
+            isOpen={isOpen}
           />
         ))}
       </div>
@@ -144,7 +151,7 @@ function CategoryCard({
   );
 }
 
-export default function MenuTabs({ availability }: { availability: Availability }) {
+export default function MenuTabs({ availability, isOpen = true }: { availability: Availability; isOpen?: boolean }) {
   const [tab, setTab] = useState<"veg" | "nonveg">("veg");
   const menu = tab === "veg" ? vegMenu : nonVegMenu;
   const groups = groupCategories(menu);
@@ -189,11 +196,11 @@ export default function MenuTabs({ availability }: { availability: Availability 
           Array.isArray(group) ? (
             <div key={idx} className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-6">
               {group.map((cat) => (
-                <CategoryCard key={cat.name} category={cat} availability={availability} />
+                <CategoryCard key={cat.name} category={cat} availability={availability} isOpen={isOpen} />
               ))}
             </div>
           ) : (
-            <CategoryCard key={group.name} category={group} availability={availability} />
+            <CategoryCard key={group.name} category={group} availability={availability} isOpen={isOpen} />
           )
         )}
       </div>

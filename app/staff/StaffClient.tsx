@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { supabase } from "../lib/supabase";
 import { vegMenu, nonVegMenu } from "../data/menu";
 import type { Availability } from "../api/availability/route";
 import type { StaffOrder } from "./page";
@@ -35,19 +36,56 @@ const allMenus = [...vegMenu, ...nonVegMenu];
 const vegItemNames = new Set(vegMenu.flatMap((c) => c.items.map((i) => i.name)));
 
 export default function StaffClient({
-  orders,
+  orders: initialOrders,
   availability: initial,
 }: {
   orders: StaffOrder[];
   availability: Availability;
 }) {
   const router = useRouter();
+  const [orders, setOrders] = useState<StaffOrder[]>(initialOrders);
   const [tab, setTab] = useState<"orders" | "menu">("orders");
   const [availability, setAvailability] = useState<Availability>(initial);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const audioCtx = useRef<AudioContext | null>(null);
+
+  function playAlert() {
+    try {
+      if (!audioCtx.current) audioCtx.current = new AudioContext();
+      const ctx = audioCtx.current;
+      [0, 0.15, 0.3].forEach((delay) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = 880;
+        gain.gain.setValueAtTime(0.4, ctx.currentTime + delay);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.3);
+        osc.start(ctx.currentTime + delay);
+        osc.stop(ctx.currentTime + delay + 0.3);
+      });
+    } catch {}
+  }
+
+  useEffect(() => {
+    const channel = supabase
+      .channel("new-orders")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "orders" },
+        (payload) => {
+          setOrders((prev) => [payload.new as StaffOrder, ...prev]);
+          setTab("orders");
+          playAlert();
+        }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   async function handleLogout() {
     await fetch("/api/staff-logout", { method: "POST" });

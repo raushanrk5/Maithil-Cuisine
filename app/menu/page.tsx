@@ -5,6 +5,7 @@ import MenuTabs from "./MenuTabs";
 import CartBar from "../components/CartBar";
 import { supabase } from "../lib/supabase";
 import type { Availability } from "../api/availability/route";
+import { isRestaurantOpen, HOURS_DISPLAY } from "../lib/hours";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,8 @@ export default async function MenuPage() {
     disabled_categories: [],
     disabled_items: [],
   };
+
+  const open = isRestaurantOpen();
 
   return (
     <>
@@ -69,10 +72,17 @@ export default async function MenuPage() {
         <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-linear-to-r from-transparent via-brand-gold to-transparent" />
       </section>
 
+      {/* Closed banner */}
+      {!open && (
+        <div className="bg-brand-navy/90 text-white text-center py-3 px-4 text-sm">
+          🕐 We&apos;re currently closed. Order hours: <span className="text-brand-gold font-semibold">{HOURS_DISPLAY}</span>
+        </div>
+      )}
+
       {/* Menu content */}
       <main className="bg-brand-cream min-h-screen">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-16">
-          <MenuTabs availability={availability} />
+          <MenuTabs availability={availability} isOpen={open} />
         </div>
       </main>
 

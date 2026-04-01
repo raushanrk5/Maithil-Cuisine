@@ -1,8 +1,6 @@
 import { supabase } from "../../lib/supabase";
-import { Resend } from "resend";
 import { vegMenu, nonVegMenu } from "../../data/menu";
-
-const resend = new Resend(process.env.RESEND_API_KEY);
+import { isRestaurantOpen } from "../../lib/hours";
 
 // Build canonical price map — single source of truth, never trust the client
 function parseMenuPrice(priceStr: string): number {
@@ -17,20 +15,15 @@ for (const category of [...vegMenu, ...nonVegMenu]) {
   }
 }
 
-function escapeHtml(str: string): string {
-  return String(str)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
 type RawItem = { name: string; quantity: unknown };
 
 export async function POST(request: Request) {
   try {
     const { name, phone, address, items } = await request.json();
+
+    if (!isRestaurantOpen()) {
+      return Response.json({ error: "We are currently closed. Order hours: 11:30 AM – 11:00 PM" }, { status: 400 });
+    }
 
     if (!name || !phone || !address || !items?.length) {
       return Response.json({ error: "Missing required fields" }, { status: 400 });
@@ -83,63 +76,32 @@ export async function POST(request: Request) {
 
     const orderId = order.id.slice(0, 8).toUpperCase();
 
-    // Escape all user content before embedding in HTML email
-    const safeName = escapeHtml(name);
-    const safePhone = escapeHtml(phone);
-    const safeAddress = escapeHtml(address);
+    // Send Telegram notification
+    const telegramToken = process.env.TELEGRAM_BOT_TOKEN;
+    const telegramChatId = process.env.TELEGRAM_CHAT_ID;
+    if (telegramToken && telegramChatId) {
+      const itemLines = validatedItems
+        .map((i) => `• ${i.name} × ${i.quantity} — ₹${i.price * i.quantity}`)
+        .join("\n");
+      const telegramMsg =
+        `🍽️ <b>New Order #${orderId}</b>\n\n` +
+        `👤 <b>Name:</b> ${name}\n` +
+        `📞 <b>Phone:</b> <a href="tel:+91${phone}">${phone}</a>\n` +
+        `📍 <b>Address:</b> ${address}\n\n` +
+        `<b>Items:</b>\n${itemLines}\n\n` +
+        `💰 <b>Total: ₹${total}</b>`;
 
-    await resend.emails.send({
-      from: "onboarding@resend.dev",
-      to: process.env.OWNER_EMAIL!,
-      subject: `🍽️ New Order #${orderId} — ₹${total}`,
-      html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-          <div style="background: #1E2D5A; padding: 24px; border-radius: 12px 12px 0 0;">
-            <h1 style="color: #C9A84C; margin: 0; font-size: 22px;">🍽️ New Order Received</h1>
-            <p style="color: white; margin: 6px 0 0; font-size: 14px;">Order #${orderId}</p>
-          </div>
+      fetch(`https://api.telegram.org/bot${telegramToken}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: telegramChatId,
+          text: telegramMsg,
+          parse_mode: "HTML",
+        }),
+      }).catch(() => {}); // non-blocking, don't fail the order if Telegram fails
+    }
 
-          <div style="background: #FDF5E6; padding: 24px; border-radius: 0 0 12px 12px; border: 1px solid #F0DFC0;">
-
-            <h2 style="color: #1E2D5A; font-size: 16px; margin: 0 0 12px;">Customer Details</h2>
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px;">
-              <tr><td style="padding: 4px 0; color: #666; width: 100px;">Name</td><td style="font-weight: bold; color: #1E2D5A;">${safeName}</td></tr>
-              <tr><td style="padding: 4px 0; color: #666;">Phone</td><td style="font-weight: bold; color: #1E2D5A;">${safePhone}</td></tr>
-              <tr><td style="padding: 4px 0; color: #666;">Address</td><td style="font-weight: bold; color: #1E2D5A;">${safeAddress}</td></tr>
-            </table>
-
-            <h2 style="color: #1E2D5A; font-size: 16px; margin: 0 0 12px;">Order Items</h2>
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px;">
-              <thead>
-                <tr style="background: #1E2D5A; color: white;">
-                  <th style="padding: 8px 12px; text-align: left; border-radius: 6px 0 0 6px;">Item</th>
-                  <th style="padding: 8px 12px; text-align: center;">Qty</th>
-                  <th style="padding: 8px 12px; text-align: right; border-radius: 0 6px 6px 0;">Price</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${validatedItems
-                  .map(
-                    (item, i) => `
-                  <tr style="background: ${i % 2 === 0 ? "white" : "#FDF5E6"}">
-                    <td style="padding: 8px 12px; color: #1E2D5A;">${escapeHtml(item.name)}</td>
-                    <td style="padding: 8px 12px; text-align: center; color: #1E2D5A;">×${item.quantity}</td>
-                    <td style="padding: 8px 12px; text-align: right; color: #8B2020; font-weight: bold;">₹${item.price * item.quantity}</td>
-                  </tr>
-                `
-                  )
-                  .join("")}
-              </tbody>
-            </table>
-
-            <div style="background: #1E2D5A; color: white; padding: 14px 20px; border-radius: 8px; display: flex; justify-content: space-between;">
-              <span style="font-size: 16px; font-weight: bold;">Total Amount</span>
-              <span style="font-size: 20px; font-weight: bold; color: #C9A84C;">₹${total}</span>
-            </div>
-          </div>
-        </div>
-      `,
-    });
 
     return Response.json({ success: true, orderId });
   } catch (err) {

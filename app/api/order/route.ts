@@ -1,6 +1,21 @@
 import { supabase } from "../../lib/supabase";
 import { vegMenu, nonVegMenu } from "../../data/menu";
 import { isRestaurantOpen } from "../../lib/hours";
+import { headers } from "next/headers";
+
+const orderRateLimit = new Map<string, { count: number; resetAt: number }>();
+
+function checkOrderLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = orderRateLimit.get(ip);
+  if (!entry || now > entry.resetAt) {
+    orderRateLimit.set(ip, { count: 1, resetAt: now + 60 * 60 * 1000 });
+    return true;
+  }
+  if (entry.count >= 3) return false;
+  entry.count++;
+  return true;
+}
 
 // Build canonical price map — single source of truth, never trust the client
 function parseMenuPrice(priceStr: string): number {
@@ -19,6 +34,12 @@ type RawItem = { name: string; quantity: unknown };
 
 export async function POST(request: Request) {
   try {
+    const headersList = await headers();
+    const ip = headersList.get("x-forwarded-for")?.split(",")[0].trim() ?? "unknown";
+    if (!checkOrderLimit(ip)) {
+      return Response.json({ error: "Too many orders. Please try again later." }, { status: 429 });
+    }
+
     const { name, phone, address, items } = await request.json();
 
     if (!isRestaurantOpen()) {

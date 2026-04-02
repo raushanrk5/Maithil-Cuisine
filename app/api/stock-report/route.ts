@@ -40,8 +40,7 @@ export async function POST(request: Request) {
     lines.join("\n") +
     `\n\n<i>${entries.length} item${entries.length > 1 ? "s" : ""} flagged</i>`;
 
-  const res = await fetch(
-    `https://api.telegram.org/bot${telegramToken}/sendMessage`,
+  const res = await fetch(`https://api.telegram.org/bot${telegramToken}/sendMessage`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },

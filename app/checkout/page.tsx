@@ -9,9 +9,9 @@ export default function CheckoutPage() {
   const { items, total, itemCount, clear } = useCart();
   const router = useRouter();
 
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [address, setAddress] = useState("");
+  const [name, setName] = useState(() => typeof window !== "undefined" ? localStorage.getItem("checkout_name") ?? "" : "");
+  const [phone, setPhone] = useState(() => typeof window !== "undefined" ? localStorage.getItem("checkout_phone") ?? "" : "");
+  const [address, setAddress] = useState(() => typeof window !== "undefined" ? localStorage.getItem("checkout_address") ?? "" : "");
   const [lookingUp, setLookingUp] = useState(false);
   const [isReturning, setIsReturning] = useState(false);
   const [placing, setPlacing] = useState(false);
@@ -63,6 +63,9 @@ export default function CheckoutPage() {
 
       setPlaced(true);
       clear();
+      localStorage.removeItem("checkout_name");
+      localStorage.removeItem("checkout_phone");
+      localStorage.removeItem("checkout_address");
       router.push(`/order-success?id=${data.orderId}`);
     } catch {
       setError("Something went wrong. Please try again.");
@@ -130,7 +133,7 @@ export default function CheckoutPage() {
                     <input
                       type="tel"
                       value={phone}
-                      onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                      onChange={(e) => { const v = e.target.value.replace(/\D/g, "").slice(0, 10); setPhone(v); localStorage.setItem("checkout_phone", v); }}
                       placeholder="10-digit mobile number"
                       required
                       className="w-full border border-brand-cream-dark rounded-xl px-4 py-3 text-brand-navy text-sm focus:outline-none focus:border-brand-gold placeholder:text-brand-navy/30"
@@ -156,7 +159,7 @@ export default function CheckoutPage() {
                   <input
                     type="text"
                     value={name}
-                    onChange={(e) => setName(e.target.value)}
+                    onChange={(e) => { setName(e.target.value); localStorage.setItem("checkout_name", e.target.value); }}
                     placeholder="Your name"
                     required
                     className="w-full border border-brand-cream-dark rounded-xl px-4 py-3 text-brand-navy text-sm focus:outline-none focus:border-brand-gold placeholder:text-brand-navy/30"
@@ -170,7 +173,7 @@ export default function CheckoutPage() {
                   </label>
                   <textarea
                     value={address}
-                    onChange={(e) => setAddress(e.target.value)}
+                    onChange={(e) => { setAddress(e.target.value); localStorage.setItem("checkout_address", e.target.value); }}
                     placeholder="House no., street, landmark..."
                     required
                     rows={3}

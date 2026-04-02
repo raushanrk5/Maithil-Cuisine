@@ -112,7 +112,7 @@ export async function POST(request: Request) {
         `<b>Items:</b>\n${itemLines}\n\n` +
         `💰 <b>Total: ₹${total}</b>`;
 
-      fetch(`https://api.telegram.org/bot${telegramToken}/sendMessage`, {
+      await fetch(`https://api.telegram.org/bot${telegramToken}/sendMessage`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -120,7 +120,7 @@ export async function POST(request: Request) {
           text: telegramMsg,
           parse_mode: "HTML",
         }),
-      }).catch(() => {}); // non-blocking, don't fail the order if Telegram fails
+      }).catch(() => {});
     }
 
 

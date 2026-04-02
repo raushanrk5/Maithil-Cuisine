@@ -39,12 +39,18 @@ const vegItemNames = new Set(vegMenu.flatMap((c) => c.items.map((i) => i.name)))
 export default function StaffClient({
   orders: initialOrders,
   availability: initial,
+  todayRevenue: initialTodayRevenue,
+  totalRevenue: initialTotalRevenue,
 }: {
   orders: StaffOrder[];
   availability: Availability;
+  todayRevenue: number;
+  totalRevenue: number;
 }) {
   const router = useRouter();
   const [orders, setOrders] = useState<StaffOrder[]>(initialOrders);
+  const [todayRevenue, setTodayRevenue] = useState(initialTodayRevenue);
+  const [totalRevenue, setTotalRevenue] = useState(initialTotalRevenue);
   const [tab, setTab] = useState<"orders" | "menu" | "stock">("orders");
   const [availability, setAvailability] = useState<Availability>(initial);
   const [saving, setSaving] = useState(false);
@@ -125,6 +131,22 @@ export default function StaffClient({
     } else {
       setStockError(true);
       setTimeout(() => setStockError(false), 3000);
+    }
+  }
+
+  async function markDelivered(id: string) {
+    const res = await fetch("/api/order-status", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, status: "delivered" }),
+    });
+    if (res.ok) {
+      const order = orders.find((o) => o.id === id);
+      if (order && order.status !== "delivered") {
+        setOrders((prev) => prev.map((o) => o.id === id ? { ...o, status: "delivered" } : o));
+        setTodayRevenue((prev) => prev + order.total);
+        setTotalRevenue((prev) => prev + order.total);
+      }
     }
   }
 
@@ -213,6 +235,18 @@ export default function StaffClient({
         {/* Orders tab */}
         {tab === "orders" && (
           <>
+            {/* Revenue summary */}
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="bg-white rounded-2xl border border-brand-cream-dark p-4 text-center">
+                <p className="text-brand-navy/40 text-xs uppercase tracking-wide mb-1">Today's Revenue</p>
+                <p className="text-brand-crimson font-black text-2xl">₹{todayRevenue}</p>
+              </div>
+              <div className="bg-white rounded-2xl border border-brand-cream-dark p-4 text-center">
+                <p className="text-brand-navy/40 text-xs uppercase tracking-wide mb-1">Total Revenue</p>
+                <p className="text-brand-navy font-black text-2xl">₹{totalRevenue}</p>
+              </div>
+            </div>
+
             {orders.length === 0 ? (
               <div className="bg-white rounded-2xl p-12 text-center border border-brand-cream-dark">
                 <p className="text-5xl mb-4">🍽️</p>
@@ -229,9 +263,21 @@ export default function StaffClient({
                       <span className="text-brand-navy font-bold text-sm">
                         #{order.id.slice(0, 8).toUpperCase()}
                       </span>
-                      <span className="text-brand-navy/40 text-xs">
-                        {formatTime(order.created_at)} · {timeAgo(order.created_at)}
-                      </span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-brand-navy/40 text-xs">
+                          {formatTime(order.created_at)} · {timeAgo(order.created_at)}
+                        </span>
+                        {order.status === "delivered" ? (
+                          <span className="text-xs text-green-600 font-semibold">✓ Delivered</span>
+                        ) : (
+                          <button
+                            onClick={() => markDelivered(order.id)}
+                            className="text-xs bg-green-600 text-white px-3 py-1 rounded-lg font-semibold hover:bg-green-700 transition-colors"
+                          >
+                            Mark Delivered
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     <div className="p-5 grid sm:grid-cols-2 gap-5">

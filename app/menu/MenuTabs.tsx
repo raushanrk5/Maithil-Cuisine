@@ -1,6 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+
+function clientIsOpen(): boolean {
+  const now = new Date();
+  const ist = new Date(now.getTime() + 5.5 * 60 * 60 * 1000);
+  const total = ist.getUTCHours() * 60 + ist.getUTCMinutes();
+  return total >= 690 && total < 1380; // 11:30 AM – 11:00 PM IST
+}
 import { vegMenu, nonVegMenu, type MenuCategory, type MenuItem } from "../data/menu";
 import { useCart } from "../context/CartContext";
 import type { Availability } from "../api/availability/route";
@@ -151,8 +158,14 @@ function CategoryCard({
   );
 }
 
-export default function MenuTabs({ availability, isOpen = true }: { availability: Availability; isOpen?: boolean }) {
+export default function MenuTabs({ availability, isOpen: serverIsOpen = true }: { availability: Availability; isOpen?: boolean }) {
   const [tab, setTab] = useState<"veg" | "nonveg">("veg");
+  const [isOpen, setIsOpen] = useState(serverIsOpen);
+
+  useEffect(() => {
+    // Override server value with client-side check — handles stale PWA cache
+    setIsOpen(clientIsOpen());
+  }, []);
   const menu = tab === "veg" ? vegMenu : nonVegMenu;
   const groups = groupCategories(menu);
 
